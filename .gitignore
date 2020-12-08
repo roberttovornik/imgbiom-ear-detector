@@ -1,3 +1,41 @@
+# +----------------------------+
+# |     PROJECT STRUCTIRE      |
+# +----------------------------+
+models/*
+!models/.gitkeep
+
+training/models
+!training/models/.gitkeep
+
+training/pretrained_models
+!training/pretrained_models/.gitkeep
+
+training/images/train
+!training/images/train
+
+training/images/test
+!training/images/test
+
+training/images/train_masks_rect
+!training/images/train_masks_rect
+
+training/images/test_masks_rect
+!training/images/test_masks_rect
+
+!training/images/text_extra
+
+training/images/output
+!training/images/output
+
+
+# +----------------------------+
+# |         IDE files          |
+# +----------------------------+
+.vscode
+
+# +----------------------------+
+# |           PYTHON           |
+# +----------------------------+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
