@@ -24,6 +24,7 @@ training/images/test_masks_rect
 
 !test/images/.gitkeep
 !test/output/.gitkeep
+!test/metrics/.gitkeep
 
 
 # +----------------------------+
