@@ -4,8 +4,10 @@
 models/*
 !models/.gitkeep
 
-training/models
+training/models/*
 !training/models/.gitkeep
+training/models/ear_detection_ssd_mobilenet_v2_fpnlite
+!training/models/ear_detection_ssd_mobilenet_v2_fpnlite/.gitkeep
 !training/models/ear_detection_ssd_mobilenet_v2_fpnlite/pipeline.config
 !training/models/ear_detection_ssd_mobilenet_v2_fpnlite/checkpoint
 !training/models/ear_detection_ssd_mobilenet_v2_fpnlite/ckpt-54.data-00000-of-00001
