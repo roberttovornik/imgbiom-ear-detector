@@ -44,7 +44,7 @@
     <!-- <a href="https://github.com/roberttovornik/imgbiom-ear-detector"><strong>Explore the docs »</strong></a> -->
     <!-- <br /> -->
     <!-- <br /> -->
-    <a href="https://github.com/roberttovornik/imgbiom-ear-detector/tree/main/test/images">View Demo</a>
+    <a href="https://github.com/roberttovornik/imgbiom-ear-detector/tree/main/test/output">View Demo</a>
     ·
     <a href="https://github.com/roberttovornik/imgbiom-ear-detector/issues">Report Bug</a>
     ·
