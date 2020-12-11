@@ -152,7 +152,9 @@ Output of the detection will be (default) **saved** into **test/output**.
 
 <!-- USAGE EXAMPLES -->
 ## Evaluation (optional)
+Evaluation results of the current model can be accessed [here](https://github.com/roberttovornik/imgbiom-ear-detector/tree/main/test/metrics).
 
+To run your own:
 Activate conda environment  (default_name: **biom-task2**)
 ```sh
    conda activate environment_name
