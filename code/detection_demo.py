@@ -11,6 +11,7 @@ from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as viz_utils
 from PIL import Image
 from pathlib import Path
+from shapely.geometry import Polygon
 
 
 def dir_img_files(path_dir, img_extensions=["png", "jpg", "jpeg"]):
@@ -108,6 +109,90 @@ def read_img_to_tensor(image_path):
     return image_tensor, image
 
 
+def intersects(first, other):
+    """ TODO: Adapt to xmin xmax, ymin, ymax """
+    return not (
+        first.top_right.x < other.bottom_left.x
+        or first.bottom_left.x > other.top_right.x
+        or first.top_right.y < other.bottom_left.y
+        or first.bottom_left.y > other.top_right.y
+    )
+
+
+def threshold_detections(detections, min_confidence):
+
+    accepted_detections = []
+    for i, det_score in enumerate(detections["detection_scores"]):
+        if det_score > min_confidence:
+            accepted_detections.append(i)
+
+    return accepted_detections
+
+
+def reduce_detections(detections, detection_indices, img_w, img_h):
+    """ 
+        Removes overlapping detections
+        Important note: Tensorflow detections are already sorted by detection score!
+            (optional) 
+
+        TODO: Could tweak this paramter based on num of faces (2 ears per person max)
+        TODO: Improvement - merge with face detector?
+        TODO: improve selection accuracy by questioning first selection:
+            example case:   High confidence for left ear, but all further detections pick right ear in same spot
+                            (with similar score)
+    """
+
+    unique_classes, unique_indices, unique_boxes = [], [], []
+    for i in detection_indices:
+
+        det_class = detections["detection_classes"][i]
+        new_box = get_polygon_bbox(get_pixel_bbox(detections["detection_boxes"][i], img_w, img_h))
+
+        if (det_class not in unique_classes) or (
+            not any([intersect_boxes(new_box, box_x) for box_x in unique_boxes])
+        ):
+            unique_classes.append(det_class)
+            unique_indices.append(i)
+            unique_boxes.append(
+                get_polygon_bbox(get_pixel_bbox(detections["detection_boxes"][i], img_w, img_h))
+            )
+
+    return unique_indices
+
+
+def get_pixel_bbox(tf_bbox, img_w, img_h):
+
+    x_min = int(max(1, (tf_bbox[1] * img_w)))
+    x_max = int(min(img_w, (tf_bbox[3] * img_w)))
+    y_min = int(max(1, (tf_bbox[0] * img_h)))
+    y_max = int(min(img_h, (tf_bbox[2] * img_h)))
+
+    return [x_min, y_min, x_max, y_max]
+
+
+def get_polygon_bbox(pixel_box):
+
+    [x_min, y_min, x_max, y_max] = pixel_box
+
+    return [[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]]
+
+
+def get_iou(box_1, box_2):
+
+    poly_1 = Polygon(box_1)
+    poly_2 = Polygon(box_2)
+    iou = poly_1.intersection(poly_2).area / poly_1.union(poly_2).area
+
+    return iou
+
+
+def intersect_boxes(box_1, box_2):
+
+    if get_iou(box_1, box_2) > 0:
+        return True
+    return False
+
+
 def visualize_detections(image, detections, min_conf, category_index, dir_out, img_path, save=True):
 
     img_h, img_w, _ = image.shape
@@ -118,55 +203,58 @@ def visualize_detections(image, detections, min_conf, category_index, dir_out, i
 
     # detection_classes should be ints.
     detections["detection_classes"] = detections["detection_classes"].astype(np.int64)
-    # print(detections)
 
     scores = detections["detection_scores"]
     boxes = detections["detection_boxes"]
     classes = detections["detection_classes"]
+
+    detection_indices_th = threshold_detections(detections, min_conf)
+    reduced_detection_indices = reduce_detections(detections, detection_indices_th, img_w, img_h)
+
     count = 0
-    for i in range(len(scores)):
+    # for i in range(len(scores)):
+    for i in reduced_detection_indices:
         if (scores[i] > min_conf) and (scores[i] <= 1.0):
             # increase count
             count += 1
             # Get bounding box coordinates and draw box
-            # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
-            ymin = int(max(1, (boxes[i][0] * img_h)))
-            xmin = int(max(1, (boxes[i][1] * img_w)))
-            ymax = int(min(img_h, (boxes[i][2] * img_h)))
-            xmax = int(min(img_w, (boxes[i][3] * img_w)))
+            [x_min, y_min, x_max, y_max] = get_pixel_bbox(boxes[i], img_w, img_h)
+            cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (10, 255, 0), 2)
 
-            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (10, 255, 0), 2)
-            # Draw label
-            object_name = category_index[int(classes[i])][
-                "name"
-            ]  # Look up object name from "labels" array using class index
-
+            object_name = category_index[int(classes[i])]["name"]
             label = "%d%%:%s" % (int(scores[i] * 100), object_name)  # Example: 'person: 72%'
-            labelSize, baseLine = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
-            )  # Get font size
-            label_ymin = max(
-                ymin, labelSize[1] + 10
-            )  # Make sure not to draw label too close to top of window
+            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            label_y_min = max(y_min, labelSize[1] + 10)
+            # Realign if required (not to draw over image's edges)
+            over_edge = (
+                ((x_min + labelSize[0]) - img_w) + 5 if ((x_min + labelSize[0]) - img_w) > 0 else 0
+            )
+            # Print label with bounding rectangle (for visiblity)
             cv2.rectangle(
                 image,
-                (xmin, label_ymin - labelSize[1] - 10),
-                (xmin + labelSize[0], label_ymin + baseLine - 10),
+                (x_min - over_edge, label_y_min - labelSize[1] - 10),
+                (x_min + labelSize[0] - over_edge, label_y_min + baseLine - 10),
                 (255, 255, 255),
                 cv2.FILLED,
-            )  # Draw white box to put label text in
+            )
             cv2.putText(
-                image, label, (xmin, label_ymin - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1
-            )  # Draw label text
+                image,
+                label,
+                (x_min - over_edge, label_y_min - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 0),
+                1,
+            )
 
     cv2.putText(
         image,
-        "Number of kept detections : " + str(count),
+        "Number of detections : " + str(count),
         (10, 25),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
+        0.6,
         (10, 255, 0),
-        1,
+        2,
         cv2.LINE_AA,
     )
 
@@ -182,7 +270,7 @@ def main():
     PATH_TO_LABELS = Path(
         "training/exported_models/ear_detection_ssd_mobilenet_v2_fpnlite_model/saved_model/label_map.pbtxt"
     )
-    MIN_CONF_THRESH = float(0.25)
+    MIN_CONF_THRESH = float(0.07)
     DIR_IMAGES_TEST = Path("test/images")
     DIR_IMAGES_OUT = Path("test/output")
 
