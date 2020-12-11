@@ -133,9 +133,8 @@ def reduce_detections(detections, detection_indices, img_w, img_h):
     """ 
         Removes overlapping detections
         Important note: Tensorflow detections are already sorted by detection score!
-            (optional) 
-
-        TODO: Could tweak this paramter based on num of faces (2 ears per person max)
+            (optional)
+        TODO: Could tweak this paramter based on num of faces (2 ears, 1 of each class, per person max)
         TODO: Improvement - merge with face detector?
         TODO: improve selection accuracy by questioning first selection:
             example case:   High confidence for left ear, but all further detections pick right ear in same spot
@@ -145,13 +144,11 @@ def reduce_detections(detections, detection_indices, img_w, img_h):
     unique_classes, unique_indices, unique_boxes = [], [], []
     for i in detection_indices:
 
-        det_class = detections["detection_classes"][i]
+        # det_class = detections["detection_classes"][i]
         new_box = get_polygon_bbox(get_pixel_bbox(detections["detection_boxes"][i], img_w, img_h))
 
-        if (det_class not in unique_classes) or (
-            not any([intersect_boxes(new_box, box_x) for box_x in unique_boxes])
-        ):
-            unique_classes.append(det_class)
+        if not any([intersect_boxes(new_box, box_x) for box_x in unique_boxes]):
+            # unique_classes.append(det_class)
             unique_indices.append(i)
             unique_boxes.append(
                 get_polygon_bbox(get_pixel_bbox(detections["detection_boxes"][i], img_w, img_h))
